@@ -54,14 +54,52 @@ jobs:
       - name: Gradle Build
         env:
           BUILD_PLUGIN: none
+          APP_KEYSTORE_BASE64: ${{ secrets.APP_KEYSTORE_BASE64 }}
+          APP_KEYSTORE_PASSWORD: ${{ secrets.APP_KEYSTORE_PASSWORD }}
+          APP_KEYSTORE_ALIAS: ${{ secrets.APP_KEYSTORE_ALIAS }}
+          APP_KEY_PASSWORD: ${{ secrets.APP_KEY_PASSWORD }}
+          LEGACY_LOCAL_PROPERTIES: ${{ secrets.LOCAL_PROPERTIES }}
+          LEGACY_KEYSTORE_PASS: ${{ secrets.KEYSTORE_PASS }}
+          LEGACY_ALIAS_NAME: ${{ secrets.ALIAS_NAME }}
+          LEGACY_ALIAS_PASS: ${{ secrets.ALIAS_PASS }}
         run: |
           echo "sdk.dir=${ANDROID_HOME}" > local.properties
           echo "ndk.dir=${ANDROID_HOME}/ndk/25.0.8775105" >> local.properties
-          export LOCAL_PROPERTIES="${{ secrets.LOCAL_PROPERTIES }}"
           ./run init action gradle
-          ./gradlew app:assemblePreviewRelease
-          APK=$(find app/build/outputs/apk -name '*arm64-v8a*.apk')
-          APK=$(dirname $APK)
+          if [ -n "${APP_KEYSTORE_BASE64}" ] && [ -n "${APP_KEYSTORE_PASSWORD}" ] && [ -n "${APP_KEYSTORE_ALIAS}" ] && [ -n "${APP_KEY_PASSWORD}" ]; then
+            printf '%s' "${APP_KEYSTORE_BASE64}" | base64 --decode > "${RUNNER_TEMP}/android_keystore.jks"
+            ./gradlew app:assemblePreviewRelease \
+              -Pandroid.injected.signing.store.file="${RUNNER_TEMP}/android_keystore.jks" \
+              -Pandroid.injected.signing.store.password="${APP_KEYSTORE_PASSWORD}" \
+              -Pandroid.injected.signing.key.alias="${APP_KEYSTORE_ALIAS}" \
+              -Pandroid.injected.signing.key.password="${APP_KEY_PASSWORD}"
+          else
+            export LOCAL_PROPERTIES="${LEGACY_LOCAL_PROPERTIES}"
+            export KEYSTORE_PASS="${LEGACY_KEYSTORE_PASS}"
+            export ALIAS_NAME="${LEGACY_ALIAS_NAME}"
+            export ALIAS_PASS="${LEGACY_ALIAS_PASS}"
+            ./gradlew app:assemblePreviewRelease
+          fi
+          APKS=$(find app/build/outputs/apk -name '*.apk')
+          if [ -z "${APKS}" ]; then
+            echo "No preview APKs were produced."
+            exit 1
+          fi
+          SIGNED_APK=""
+          for apk in ${APKS}; do
+            "${ANDROID_HOME}/build-tools/35.0.1/apksigner" verify "${apk}"
+            if [ "${apk%-unsigned.apk}" != "${apk}" ]; then
+              mv "${apk}" "${apk%-unsigned.apk}.apk"
+              apk="${apk%-unsigned.apk}.apk"
+            fi
+            SIGNED_APK="${apk}"
+          done
+          APK="${SIGNED_APK}"
+          if [ -z "${APK}" ]; then
+            echo "No signed preview APKs were produced."
+            exit 1
+          fi
+          APK=$(dirname "${APK}")
           echo "APK=$APK" >> $GITHUB_ENV
       - uses: actions/upload-artifact@v4
         with:
