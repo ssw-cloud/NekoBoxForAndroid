@@ -4,11 +4,13 @@ source buildScript/init/env_ndk.sh
 
 if [[ "$OSTYPE" =~ ^darwin ]]; then
   export SRC_ROOT=$PWD
+  PREBUILT_HOST=darwin-x86_64
 else
   export SRC_ROOT=$(realpath .)
+  PREBUILT_HOST=linux-x86_64
 fi
 
-DEPS=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin
+DEPS=$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$PREBUILT_HOST/bin
 
 export ANDROID_ARM_CC=$DEPS/armv7a-linux-androideabi21-clang
 export ANDROID_ARM_CXX=$DEPS/armv7a-linux-androideabi21-clang++

@@ -81,11 +81,6 @@ class AboutFragment : ToolbarFragment(R.layout.layout_about) {
                                 .icon(R.drawable.ic_baseline_update_24)
                                 .text(R.string.app_version)
                                 .subText(SagerNet.appVersionNameForDisplay)
-                                .setOnClickAction {
-                                    requireContext().launchCustomTab(
-                                        "https://github.com/ssw-cloud/NekoBoxForAndroid/releases"
-                                    )
-                                }
                                 .build())
                         .addItem(
                             MaterialAboutActionItem.Builder()
